@@ -18,11 +18,11 @@ A shared test environment reservation system. Teams claim, extend, and release e
 
 | Layer | Technology |
 |---|---|
-| Backend | Go (net/http, no framework) |
+| Backend | Go (net/http) |
 | Database | MySQL 8 |
 | Auth | JWT (HS256) + bcrypt |
 | Live updates | Server-Sent Events (SSE) |
-| Frontend | React (not yet built) |
+| Frontend | React |
 
 ---
 
