@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"encoding/json"
+	"net"
 	"net/http"
 	"strconv"
 
@@ -40,6 +41,8 @@ func ClaimEnvironment(db *sql.DB) http.HandlerFunc {
 			}
 			return
 		}
+		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+		service.LogEvent(db, &userID, "hold_claimed", ip, r.Header.Get("User-Agent"))
 		writeJSON(w, http.StatusCreated, map[string]interface{}{"data": hold})
 	}
 }
@@ -78,6 +81,8 @@ func ExtendHold(db *sql.DB) http.HandlerFunc {
 			}
 			return
 		}
+		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+		service.LogEvent(db, &userID, "hold_extended", ip, r.Header.Get("User-Agent"))
 		writeJSON(w, http.StatusOK, map[string]interface{}{"data": hold})
 	}
 }
@@ -107,6 +112,8 @@ func ReleaseHold(db *sql.DB) http.HandlerFunc {
 			}
 			return
 		}
+		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+		service.LogEvent(db, &userID, "hold_released", ip, r.Header.Get("User-Agent"))
 		writeJSON(w, http.StatusOK, map[string]interface{}{"message": "hold released"})
 	}
 }
@@ -140,6 +147,8 @@ func ReclaimHold(db *sql.DB) http.HandlerFunc {
 			}
 			return
 		}
+		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+		service.LogEvent(db, &adminID, "hold_reclaimed", ip, r.Header.Get("User-Agent"))
 		writeJSON(w, http.StatusOK, map[string]interface{}{"message": "hold reclaimed"})
 	}
 }

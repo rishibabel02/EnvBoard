@@ -16,16 +16,19 @@ const userRoleKey contextKey = "userRole"
 
 func Auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing authorization header")
-			return
-		}
-
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenStr == authHeader {
-			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "authorization header must be Bearer token")
-			return
+		// SSE connections use ?token= because EventSource doesn't support custom headers
+		tokenStr := r.URL.Query().Get("token")
+		if tokenStr == "" {
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing authorization header")
+				return
+			}
+			tokenStr = strings.TrimPrefix(authHeader, "Bearer ")
+			if tokenStr == authHeader {
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "authorization header must be Bearer token")
+				return
+			}
 		}
 
 		claims, err := service.ParseToken(tokenStr)

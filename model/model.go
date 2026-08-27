@@ -47,6 +47,7 @@ type History struct {
 type Log struct {
 	ID        int       `json:"id"`
 	UserID    *int      `json:"user_id"`
+	UserName  *string   `json:"user_name"`
 	Event     string    `json:"event"`
 	IPAddress *string   `json:"ip_address"`
 	UserAgent *string   `json:"user_agent"`
@@ -80,6 +81,7 @@ type BoardEntry struct {
 type AdminAction struct {
 	ID         int       `json:"id"`
 	AdminID    int       `json:"admin_id"`
+	AdminName  string    `json:"admin_name"`
 	Action     string    `json:"action"`
 	TargetType *string   `json:"target_type"`
 	TargetID   *int      `json:"target_id"`

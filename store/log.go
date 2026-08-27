@@ -31,9 +31,10 @@ func InsertAdminAction(db *sql.DB, adminID int, action string, targetType *strin
 
 func ListLogs(db *sql.DB, limit, offset int) ([]model.Log, error) {
 	query := `
-		SELECT id, user_id, event, ip_address, user_agent, details, created_at
-		FROM logs
-		ORDER BY created_at DESC
+		SELECT l.id, l.user_id, u.name, l.event, l.ip_address, l.user_agent, l.details, l.created_at
+		FROM logs l
+		LEFT JOIN users u ON u.id = l.user_id
+		ORDER BY l.created_at DESC
 		LIMIT ? OFFSET ?`
 
 	rows, err := db.Query(query, limit, offset)
@@ -46,7 +47,7 @@ func ListLogs(db *sql.DB, limit, offset int) ([]model.Log, error) {
 	for rows.Next() {
 		var l model.Log
 		err := rows.Scan(
-			&l.ID, &l.UserID, &l.Event,
+			&l.ID, &l.UserID, &l.UserName, &l.Event,
 			&l.IPAddress, &l.UserAgent, &l.Details, &l.CreatedAt,
 		)
 		if err != nil {
@@ -59,9 +60,10 @@ func ListLogs(db *sql.DB, limit, offset int) ([]model.Log, error) {
 
 func ListAdminActions(db *sql.DB, limit, offset int) ([]model.AdminAction, error) {
 	query := `
-		SELECT id, admin_id, action, target_type, target_id, details, created_at
-		FROM admin_actions
-		ORDER BY created_at DESC
+		SELECT aa.id, aa.admin_id, u.name, aa.action, aa.target_type, aa.target_id, aa.details, aa.created_at
+		FROM admin_actions aa
+		JOIN users u ON u.id = aa.admin_id
+		ORDER BY aa.created_at DESC
 		LIMIT ? OFFSET ?`
 
 	rows, err := db.Query(query, limit, offset)
@@ -74,7 +76,7 @@ func ListAdminActions(db *sql.DB, limit, offset int) ([]model.AdminAction, error
 	for rows.Next() {
 		var a model.AdminAction
 		err := rows.Scan(
-			&a.ID, &a.AdminID, &a.Action,
+			&a.ID, &a.AdminID, &a.AdminName, &a.Action,
 			&a.TargetType, &a.TargetID, &a.Details, &a.CreatedAt,
 		)
 		if err != nil {
