@@ -38,6 +38,9 @@ type History struct {
 	ID            int       `json:"id"`
 	EnvironmentID int       `json:"environment_id"`
 	UserID        int       `json:"user_id"`
+	UserName      string    `json:"user_name"`
+	ActorID       *int      `json:"actor_id"`
+	ActorName     string    `json:"actor_name"`
 	HoldID        *int      `json:"hold_id"`
 	Action        string    `json:"action"`
 	Reason        *string   `json:"reason"`
@@ -76,6 +79,20 @@ type BoardEntry struct {
 	ConsoleURL  string         `json:"console_url"`
 	Status      string         `json:"status"`
 	Hold        *BoardHoldInfo `json:"hold"`
+}
+
+type AuditItem struct {
+	ID              int       `json:"id"`
+	EnvironmentID   int       `json:"environment_id"`
+	EnvironmentName string    `json:"environment_name"`
+	HoldID          *int      `json:"hold_id"`
+	UserID          int       `json:"user_id"`
+	UserName        string    `json:"user_name"`
+	ActorID         *int      `json:"actor_id"`
+	ActorName       string    `json:"actor_name"`
+	Action          string    `json:"action"`
+	Reason          *string   `json:"reason"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type AdminAction struct {

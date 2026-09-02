@@ -10,6 +10,9 @@ import (
 )
 
 func GetBoardState(db *sql.DB) ([]model.BoardEntry, error) {
+	// Best-effort: write history rows for any holds that expired since the last read.
+	store.WriteExpiredHoldHistories(db)
+
 	envs, err := store.ListEnvironments(db)
 	if err != nil {
 		return nil, fmt.Errorf("service.GetBoardState: %w", err)

@@ -1,28 +1,35 @@
 import { useState } from 'react'
 import Modal from './Modal'
 import { claimEnvironment } from '../../api/holds'
+import type { BoardEntry } from '../../types'
 
 const DURATIONS = [
-  { label: '30 min', value: 30 },
-  { label: '1 hour', value: 60 },
+  { label: '30 min',  value: 30  },
+  { label: '1 hour',  value: 60  },
   { label: '2 hours', value: 120 },
   { label: '4 hours', value: 240 },
 ]
 
-export default function ClaimModal({ env, onClose, onSuccess }) {
-  const [purpose,  setPurpose]  = useState('')
-  const [duration, setDuration] = useState(60)
-  const [custom,   setCustom]   = useState('')
-  const [useCustom, setUseCustom] = useState(false)
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState('')
+interface Props {
+  env: BoardEntry
+  onClose: () => void
+  onSuccess: () => void
+}
 
-  async function handleSubmit(e) {
+export default function ClaimModal({ env, onClose, onSuccess }: Props) {
+  const [purpose,   setPurpose]   = useState('')
+  const [duration,  setDuration]  = useState(60)
+  const [custom,    setCustom]    = useState('')
+  const [useCustom, setUseCustom] = useState(false)
+  const [loading,   setLoading]   = useState(false)
+  const [error,     setError]     = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const mins = useCustom ? parseInt(custom) : duration
-    if (!purpose.trim())           return setError('Purpose is required')
-    if (!mins || mins < 15)        return setError('Minimum duration is 15 minutes')
-    if (mins > 480)                return setError('Maximum duration is 480 minutes (8 hours)')
+    if (!purpose.trim())        return setError('Purpose is required')
+    if (!mins || mins < 1)      return setError('Minimum duration is 1 minute')
+    if (mins > 4320)            return setError('Maximum duration is 4320 minutes (72 hours)')
 
     setLoading(true)
     setError('')
@@ -30,7 +37,7 @@ export default function ClaimModal({ env, onClose, onSuccess }) {
       await claimEnvironment(env.id, purpose.trim(), mins)
       onSuccess()
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -56,38 +63,25 @@ export default function ClaimModal({ env, onClose, onSuccess }) {
           <label className="block text-sm font-medium text-gray-700 mb-2">Duration</label>
           <div className="grid grid-cols-2 gap-2">
             {DURATIONS.map(d => (
-              <button
-                key={d.value}
-                type="button"
+              <button key={d.value} type="button"
                 onClick={() => { setDuration(d.value); setUseCustom(false) }}
                 className={`py-2 rounded-xl text-sm font-medium border transition-all ${
                   !useCustom && duration === d.value
                     ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                }`}
-              >
+                }`}>
                 {d.label}
               </button>
             ))}
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="custom"
-              checked={useCustom}
-              onChange={e => setUseCustom(e.target.checked)}
-              className="rounded border-gray-300 text-indigo-600"
-            />
+            <input type="checkbox" id="custom" checked={useCustom} onChange={e => setUseCustom(e.target.checked)}
+              className="rounded border-gray-300 text-indigo-600" />
             <label htmlFor="custom" className="text-sm text-gray-600">Custom:</label>
-            <input
-              type="number"
-              min={15}
-              max={480}
-              value={custom}
+            <input type="number" min={1} max={4320} value={custom}
               onChange={e => { setCustom(e.target.value); setUseCustom(true) }}
               placeholder="minutes"
-              className="w-24 rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+              className="w-24 rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
 

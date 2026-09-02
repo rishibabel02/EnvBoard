@@ -1,14 +1,23 @@
 import { useState } from 'react'
 import Modal from './Modal'
 import { reclaimHold, releaseHold } from '../../api/holds'
+import type { BoardEntry } from '../../types'
 
-export default function ReclaimModal({ env, isOwner, onClose, onSuccess }) {
+interface Props {
+  env: BoardEntry
+  isOwner: boolean
+  onClose: () => void
+  onSuccess: () => void
+}
+
+export default function ReclaimModal({ env, isOwner, onClose, onSuccess }: Props) {
   const [reason,  setReason]  = useState('')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!env.hold) return
     if (!isOwner && !reason.trim()) return setError('Reason is required')
     setLoading(true)
     setError('')
@@ -20,7 +29,7 @@ export default function ReclaimModal({ env, isOwner, onClose, onSuccess }) {
       }
       onSuccess()
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -37,13 +46,9 @@ export default function ReclaimModal({ env, isOwner, onClose, onSuccess }) {
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
             Reason <span className="text-red-500">*</span>
           </label>
-          <textarea
-            rows={3}
-            value={reason}
-            onChange={e => setReason(e.target.value)}
+          <textarea rows={3} value={reason} onChange={e => setReason(e.target.value)}
             placeholder="Why are you reclaiming this environment?"
-            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-          />
+            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
         </div>
 
         {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}

@@ -1,10 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-export function useSSE(url) {
-  const [data, setData]           = useState(null)
+interface UseSSEResult<T> {
+  data: T | null
+  connected: boolean
+  refresh: () => void
+}
+
+export function useSSE<T>(url: string): UseSSEResult<T> {
+  const [data, setData]           = useState<T | null>(null)
   const [connected, setConnected] = useState(false)
-  const esRef    = useRef(null)
-  const retryRef = useRef(null)
+  const esRef    = useRef<EventSource | null>(null)
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const connect = useCallback(() => {
     const token = localStorage.getItem('token')
@@ -20,10 +26,10 @@ export function useSSE(url) {
 
     es.onopen = () => setConnected(true)
 
-    es.onmessage = (e) => {
+    es.onmessage = (e: MessageEvent) => {
       try {
-        const parsed = JSON.parse(e.data)
-        setData(parsed.data ?? parsed)
+        const parsed = JSON.parse(e.data as string) as { data?: T }
+        setData(parsed.data ?? (parsed as unknown as T))
       } catch (_) {}
     }
 
@@ -37,14 +43,13 @@ export function useSSE(url) {
   useEffect(() => {
     connect()
     return () => {
-      clearTimeout(retryRef.current)
+      if (retryRef.current) clearTimeout(retryRef.current)
       esRef.current?.close()
     }
   }, [connect])
 
-  // Close and immediately reconnect — server sends current state on connect
   const refresh = useCallback(() => {
-    clearTimeout(retryRef.current)
+    if (retryRef.current) clearTimeout(retryRef.current)
     connect()
   }, [connect])
 

@@ -8,23 +8,24 @@ import ReclaimModal from '../components/modals/ReclaimModal'
 import { useSSE }  from '../hooks/useSSE'
 import { useAuth } from '../hooks/useAuth'
 import { releaseHold } from '../api/holds'
+import type { BoardEntry } from '../types'
 
 export default function BoardPage() {
-  const { user }                         = useAuth()
-  const { data: board, connected, refresh } = useSSE('/api/board/stream')
-  const navigate                         = useNavigate()
-  const [refreshing, setRefreshing]      = useState(false)
+  const { user }                            = useAuth()
+  const { data: board, connected, refresh } = useSSE<BoardEntry[]>('/api/board/stream')
+  const navigate                            = useNavigate()
+  const [refreshing,  setRefreshing]  = useState(false)
+  const [claimEnv,    setClaimEnv]    = useState<BoardEntry | null>(null)
+  const [extendEnv,   setExtendEnv]   = useState<BoardEntry | null>(null)
+  const [reclaimEnv,  setReclaimEnv]  = useState<BoardEntry | null>(null)
 
-  const [claimEnv,   setClaimEnv]   = useState(null)
-  const [extendEnv,  setExtendEnv]  = useState(null)
-  const [reclaimEnv, setReclaimEnv] = useState(null)
-
-  async function handleRelease(env) {
+  async function handleRelease(env: BoardEntry) {
+    if (!env.hold) return
     try {
       await releaseHold(env.hold.id)
       refresh()
     } catch (err) {
-      alert(err.message)
+      alert(err instanceof Error ? err.message : 'Error')
     }
   }
 
@@ -46,12 +47,8 @@ export default function BoardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
-            title="Refresh board"
-          >
+          <button onClick={handleRefresh} disabled={refreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50">
             <svg className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
@@ -74,10 +71,7 @@ export default function BoardPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {envs.map(env => (
-            <EnvironmentCard
-              key={env.id}
-              env={env}
-              currentUser={user}
+            <EnvironmentCard key={env.id} env={env} currentUser={user}
               onClaim={setClaimEnv}
               onExtend={setExtendEnv}
               onRelease={handleRelease}
@@ -89,26 +83,17 @@ export default function BoardPage() {
       )}
 
       {claimEnv && (
-        <ClaimModal
-          env={claimEnv}
-          onClose={() => setClaimEnv(null)}
-          onSuccess={() => { setClaimEnv(null); refresh() }}
-        />
+        <ClaimModal env={claimEnv} onClose={() => setClaimEnv(null)}
+          onSuccess={() => { setClaimEnv(null); refresh() }} />
       )}
       {extendEnv && (
-        <ExtendModal
-          env={extendEnv}
-          onClose={() => setExtendEnv(null)}
-          onSuccess={() => { setExtendEnv(null); refresh() }}
-        />
+        <ExtendModal env={extendEnv} onClose={() => setExtendEnv(null)}
+          onSuccess={() => { setExtendEnv(null); refresh() }} />
       )}
       {reclaimEnv && (
-        <ReclaimModal
-          env={reclaimEnv}
-          onClose={() => setReclaimEnv(null)}
+        <ReclaimModal env={reclaimEnv} onClose={() => setReclaimEnv(null)}
           onSuccess={() => { setReclaimEnv(null); refresh() }}
-          isOwner={reclaimEnv.hold?.holder?.id === user?.id}
-        />
+          isOwner={reclaimEnv.hold?.holder?.id === user?.id} />
       )}
     </Layout>
   )

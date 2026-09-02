@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go get *)",
+      "Bash(\"/c/Program Files/nodejs/node.exe\" \"c:/Codes/EnvBoard3/frontend/node_modules/typescript/bin/tsc\" --noEmit --project \"c:/Codes/EnvBoard3/frontend/tsconfig.json\")"
+    ]
+  }
+}

@@ -172,6 +172,43 @@ func AdminListActions(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+func AdminListAudit(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+
+		envID, _ := strconv.Atoi(q.Get("environment_id"))
+		userID, _ := strconv.Atoi(q.Get("user_id"))
+		limit, _ := strconv.Atoi(q.Get("limit"))
+		offset, _ := strconv.Atoi(q.Get("offset"))
+
+		// Validate environment_id and user_id if provided as non-empty but non-integer
+		if q.Get("environment_id") != "" && envID == 0 {
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid environment_id: must be an integer")
+			return
+		}
+		if q.Get("user_id") != "" && userID == 0 {
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid user_id: must be an integer")
+			return
+		}
+
+		page, err := service.AdminListAudit(db, service.AuditParams{
+			Action:        q.Get("action"),
+			EnvironmentID: envID,
+			UserID:        userID,
+			From:          q.Get("from"),
+			To:            q.Get("to"),
+			Limit:         limit,
+			Offset:        offset,
+		})
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]interface{}{"data": page})
+	}
+}
+
 func containsAny(s string, substrings ...string) bool {
 	for _, sub := range substrings {
 		if strings.Contains(s, sub) {
