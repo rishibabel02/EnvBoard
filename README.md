@@ -250,6 +250,123 @@ Full request/response shapes: [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md)
 
 ---
 
+## Database schema
+
+### ER Diagram
+
+![ER Diagram](docs/ER_Diagram.png)
+
+---
+
+### Tables
+
+#### `users`
+Stores every account. Admin creates all users — no self-service signup.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INT PK | Auto-increment |
+| `name` | VARCHAR(100) | Display name |
+| `email` | VARCHAR(255) | Unique — used as login identifier |
+| `password_hash` | VARCHAR(255) | bcrypt hash — plain text never stored |
+| `role` | ENUM(`member`, `admin`) | DB-enforced; only two valid values |
+| `is_active` | TINYINT(1) | 0 = deactivated; history rows preserved |
+| `created_at` | DATETIME | Set on insert |
+| `updated_at` | DATETIME | Auto-updated by MySQL on every change |
+
+---
+
+#### `environments`
+The test environments shown on the board. Admin-managed.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INT PK | Auto-increment |
+| `name` | VARCHAR(100) | Unique — board display label |
+| `description` | TEXT | Optional |
+| `console_url` | VARCHAR(500) | Optional link to the environment's console |
+| `is_active` | TINYINT(1) | 0 = hidden from board (unavailable) |
+| `created_at` | DATETIME | |
+| `updated_at` | DATETIME | |
+
+**Status is computed at read time — not stored:**
+- `is_active = 0` → `unavailable`
+- `is_active = 1`, no active hold → `available`
+- `is_active = 1`, active hold exists → `in_use`
+
+---
+
+#### `holds`
+One row per reservation. Tracks the full lifecycle of every claim.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INT PK | Auto-increment |
+| `environment_id` | INT FK | → `environments.id` |
+| `user_id` | INT FK | → `users.id` |
+| `purpose` | TEXT | Why the user claimed it |
+| `started_at` | DATETIME | Set on claim |
+| `expires_at` | DATETIME | Compared with `NOW()` on every read |
+| `released_at` | DATETIME (nullable) | Set only when ended early (release or reclaim) |
+| `status` | ENUM(`active`, `released`, `expired`, `reclaimed`) | Informational — authoritative check is always `status = 'active' AND expires_at > NOW()` |
+
+**Indexes:** `(environment_id, status)`, `(user_id, status)`
+
+---
+
+#### `history`
+Append-only audit trail. Never updated or deleted.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INT PK | Auto-increment |
+| `environment_id` | INT FK | → `environments.id` |
+| `user_id` | INT FK | Who performed the action |
+| `hold_id` | INT FK (nullable) | → `holds.id` |
+| `action` | ENUM(`claimed`, `extended`, `released`, `expired`, `reclaimed`) | |
+| `reason` | TEXT (nullable) | Mandatory only for `reclaimed`; NULL for all others |
+| `created_at` | DATETIME | |
+
+**Index:** `(environment_id)` — used by history page queries
+
+---
+
+#### `logs`
+System-level events: logins, auth failures, rate limit hits.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INT PK | Auto-increment |
+| `user_id` | INT FK (nullable) | NULL for failed logins (no authenticated user yet) |
+| `event` | VARCHAR(100) | e.g. `login_success`, `login_failed`, `rate_limit_hit` |
+| `ip_address` | VARCHAR(45) | Supports IPv6 (max 39 chars) |
+| `user_agent` | TEXT (nullable) | Browser user-agent string |
+| `details` | TEXT (nullable) | Extra context where useful |
+| `created_at` | DATETIME | |
+
+**Indexes:** `(user_id)`, `(created_at)`
+
+---
+
+#### `admin_actions`
+Every management action an admin performs on users or environments.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INT PK | Auto-increment |
+| `admin_id` | INT FK | → `users.id` (the admin who acted) |
+| `action` | VARCHAR(100) | e.g. `create_user`, `update_role`, `reclaim_hold` |
+| `target_type` | VARCHAR(50) (nullable) | `user` or `environment` |
+| `target_id` | INT (nullable) | ID of the affected user or environment |
+| `details` | TEXT (nullable) | Human-readable summary of what changed |
+| `created_at` | DATETIME | |
+
+**Index:** `(admin_id)`
+
+> A force-reclaim writes to **both** `admin_actions` (admin audit log) and `history` (environment event log).
+
+---
+
 ## Key design decisions
 
 | Concern | Decision | Why |
@@ -262,25 +379,3 @@ Full request/response shapes: [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md)
 | Timezone | `loc=Local` in MySQL DSN | Prevents `time.Now()` vs `NOW()` skew when the server's local timezone differs from UTC |
 
 ---
-
-## Configuration
-
-Before deploying to production:
-
-| Item | Location | Action |
-|---|---|---|
-| JWT secret | `service/auth.go` | Move to an environment variable |
-| DB credentials | `main.go` DSN | Move to an environment variable or secrets manager |
-| Admin default limit | `service/admin.go` | Currently `5` active holds per user; adjust as needed |
-
----
-
-## Status
-
-| Area | Status |
-|---|---|
-| Database schema | Done |
-| Go backend | Done |
-| React frontend | Done |
-
-See [`docs/CHECKLIST.md`](docs/CHECKLIST.md) for slice-by-slice progress.
