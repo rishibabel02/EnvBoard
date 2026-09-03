@@ -49,8 +49,8 @@ export default function HistoryPage() {
       limit:  LIMIT,
       offset: off,
       action: action || undefined,
-      from:   from   || undefined,
-      to:     to     || undefined,
+      from:   from ? new Date(from).toISOString() : undefined,
+      to:     to   ? new Date(to).toISOString()   : undefined,
     })
       .then(res => { setEntries(res.data.entries); setTotal(res.data.total) })
       .catch(err => setError(err instanceof Error ? err.message : 'Error'))
@@ -106,13 +106,15 @@ export default function HistoryPage() {
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
-            <input type="datetime-local" value={from} onChange={e => setFrom(e.target.value ? new Date(e.target.value).toISOString() : '')}
+            <input type="datetime-local" value={from} max={to || undefined}
+              onChange={e => setFrom(e.target.value)}
               className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
-            <input type="datetime-local" value={to} onChange={e => setTo(e.target.value ? new Date(e.target.value).toISOString() : '')}
+            <input type="datetime-local" value={to} min={from || undefined}
+              onChange={e => setTo(e.target.value)}
               className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
 
