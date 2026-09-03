@@ -103,6 +103,37 @@ func WriteExpiredHoldHistories(db *sql.DB) {
 	}
 }
 
+type ExpiringHold struct {
+	HoldID  int
+	EnvName string
+}
+
+func GetExpiringHoldsForUser(db *sql.DB, userID, withinMinutes int) ([]ExpiringHold, error) {
+	rows, err := db.Query(`
+		SELECT h.id, e.name
+		FROM holds h
+		JOIN environments e ON e.id = h.environment_id
+		WHERE h.user_id = ? AND h.status = 'active'
+		  AND h.expires_at > NOW()
+		  AND h.expires_at <= DATE_ADD(NOW(), INTERVAL ? MINUTE)`,
+		userID, withinMinutes,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("store.GetExpiringHoldsForUser: %w", err)
+	}
+	defer rows.Close()
+
+	var result []ExpiringHold
+	for rows.Next() {
+		var h ExpiringHold
+		if err := rows.Scan(&h.HoldID, &h.EnvName); err != nil {
+			return nil, fmt.Errorf("store.GetExpiringHoldsForUser: scan: %w", err)
+		}
+		result = append(result, h)
+	}
+	return result, nil
+}
+
 func ClaimEnvironment(db *sql.DB, envID, userID int, purpose string, durationMinutes int) (*model.Hold, error) {
 	tx, err := db.Begin()
 	if err != nil {

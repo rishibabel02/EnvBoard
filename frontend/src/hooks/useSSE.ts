@@ -6,11 +6,13 @@ interface UseSSEResult<T> {
   refresh: () => void
 }
 
-export function useSSE<T>(url: string): UseSSEResult<T> {
+export function useSSE<T>(url: string, onEvent?: (msg: { type: string; data: unknown }) => void): UseSSEResult<T> {
   const [data, setData]           = useState<T | null>(null)
   const [connected, setConnected] = useState(false)
-  const esRef    = useRef<EventSource | null>(null)
-  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const esRef      = useRef<EventSource | null>(null)
+  const retryRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onEventRef = useRef(onEvent)
+  onEventRef.current = onEvent
 
   const connect = useCallback(() => {
     const token = localStorage.getItem('token')
@@ -28,8 +30,12 @@ export function useSSE<T>(url: string): UseSSEResult<T> {
 
     es.onmessage = (e: MessageEvent) => {
       try {
-        const parsed = JSON.parse(e.data as string) as { data?: T }
-        setData(parsed.data ?? (parsed as unknown as T))
+        const parsed = JSON.parse(e.data as string) as { type?: string; data?: unknown }
+        if (parsed.type === 'board_update') {
+          setData(parsed.data as T)
+        } else if (parsed.type && onEventRef.current) {
+          onEventRef.current(parsed as { type: string; data: unknown })
+        }
       } catch (_) {}
     }
 

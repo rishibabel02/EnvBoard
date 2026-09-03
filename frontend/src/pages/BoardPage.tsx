@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import EnvironmentCard from '../components/EnvironmentCard'
@@ -10,9 +10,43 @@ import { useAuth } from '../hooks/useAuth'
 import { releaseHold } from '../api/holds'
 import type { BoardEntry } from '../types'
 
+interface Toast {
+  kind:        'reclaim' | 'expiry_warning'
+  envName:     string
+  reason?:     string
+  adminName?:  string
+  minutesLeft?: number
+}
+
+interface NotifData {
+  type:         string
+  env_name:     string
+  reason?:      string
+  admin_name?:  string
+  minutes_left?: number
+}
+
 export default function BoardPage() {
-  const { user }                            = useAuth()
-  const { data: board, connected, refresh } = useSSE<BoardEntry[]>('/api/board/stream')
+  const { user }          = useAuth()
+  const [toast, setToast] = useState<Toast | null>(null)
+  const toastTimer        = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleEvent = useCallback((msg: { type: string; data: unknown }) => {
+    if (msg.type === 'notification') {
+      const d = msg.data as NotifData
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+      setToast({
+        kind:        d.type as Toast['kind'],
+        envName:     d.env_name,
+        reason:      d.reason,
+        adminName:   d.admin_name,
+        minutesLeft: d.minutes_left,
+      })
+      toastTimer.current = setTimeout(() => setToast(null), 5000)
+    }
+  }, [])
+
+  const { data: board, connected, refresh } = useSSE<BoardEntry[]>('/api/board/stream', handleEvent)
   const navigate                            = useNavigate()
   const [refreshing,  setRefreshing]  = useState(false)
   const [claimEnv,    setClaimEnv]    = useState<BoardEntry | null>(null)
@@ -39,6 +73,41 @@ export default function BoardPage() {
 
   return (
     <Layout>
+      {toast && (
+        <div className={`fixed top-5 right-5 z-50 flex items-start gap-3 bg-white shadow-lg rounded-2xl px-4 py-3 max-w-sm border ${toast.kind === 'reclaim' ? 'border-red-200' : 'border-amber-200'}`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${toast.kind === 'reclaim' ? 'bg-red-100' : 'bg-amber-100'}`}>
+            {toast.kind === 'reclaim' ? (
+              <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            {toast.kind === 'reclaim' ? (
+              <>
+                <p className="text-sm font-semibold text-gray-900">Hold force-released</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  <span className="font-medium text-gray-700">{toast.envName}</span> was reclaimed
+                  {toast.adminName && <> by <span className="font-medium text-purple-700">{toast.adminName}</span></>}
+                </p>
+                {toast.reason && <p className="text-xs text-gray-400 mt-0.5 italic">"{toast.reason}"</p>}
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-gray-900">Hold expiring soon</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  <span className="font-medium text-gray-700">{toast.envName}</span> expires in {toast.minutesLeft} min
+                </p>
+              </>
+            )}
+          </div>
+          <button onClick={() => setToast(null)} className="text-gray-300 hover:text-gray-500 text-sm leading-none mt-0.5">✕</button>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Environments</h1>

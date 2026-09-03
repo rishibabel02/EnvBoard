@@ -99,22 +99,25 @@ func ReleaseHold(db *sql.DB, holdID, userID int) error {
 	return store.ReleaseHold(db, holdID, userID)
 }
 
-func ReclaimHold(db *sql.DB, holdID, adminID int, reason string) error {
+func ReclaimHold(db *sql.DB, holdID, adminID int, reason string) (*model.Hold, error) {
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
-		return fmt.Errorf("reason is required for reclaim")
+		return nil, fmt.Errorf("reason is required for reclaim")
 	}
 
 	hold, err := store.GetHoldByID(db, holdID)
 	if err != nil {
-		return fmt.Errorf("service.ReclaimHold: %w", err)
+		return nil, fmt.Errorf("service.ReclaimHold: %w", err)
 	}
 	if hold == nil {
-		return ErrNotFound
+		return nil, ErrNotFound
 	}
 	if hold.Status != "active" {
-		return ErrHoldNotActive
+		return nil, ErrHoldNotActive
 	}
 
-	return store.ReclaimHold(db, holdID, adminID, reason)
+	if err := store.ReclaimHold(db, holdID, adminID, reason); err != nil {
+		return nil, err
+	}
+	return hold, nil
 }
