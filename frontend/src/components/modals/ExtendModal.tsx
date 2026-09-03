@@ -1,23 +1,31 @@
 import { useState } from 'react'
 import Modal from './Modal'
 import { extendHold } from '../../api/holds'
+import type { BoardEntry } from '../../types'
 
 const OPTIONS = [15, 30, 60, 120]
 
-export default function ExtendModal({ env, onClose, onSuccess }) {
+interface Props {
+  env: BoardEntry
+  onClose: () => void
+  onSuccess: () => void
+}
+
+export default function ExtendModal({ env, onClose, onSuccess }: Props) {
   const [minutes, setMinutes] = useState(30)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!env.hold) return
     setLoading(true)
     setError('')
     try {
       await extendHold(env.hold.id, minutes)
       onSuccess()
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -33,9 +41,7 @@ export default function ExtendModal({ env, onClose, onSuccess }) {
             {OPTIONS.map(m => (
               <button key={m} type="button" onClick={() => setMinutes(m)}
                 className={`py-2 rounded-xl text-sm font-medium border transition-all ${
-                  minutes === m
-                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  minutes === m ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}>
                 {m < 60 ? `${m} min` : `${m / 60} hour${m > 60 ? 's' : ''}`}
               </button>
@@ -52,7 +58,7 @@ export default function ExtendModal({ env, onClose, onSuccess }) {
           </button>
           <button type="submit" disabled={loading}
             className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 transition-colors">
-            {loading ? 'Extending…' : `Add ${minutes < 60 ? `${minutes}m` : `${minutes/60}h`}`}
+            {loading ? 'Extending…' : `Add ${minutes < 60 ? `${minutes}m` : `${minutes / 60}h`}`}
           </button>
         </div>
       </form>

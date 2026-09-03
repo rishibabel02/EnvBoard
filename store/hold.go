@@ -74,6 +74,35 @@ func CountActiveHoldsForUser(db *sql.DB, userID int) (int, error) {
 	return count, nil
 }
 
+// WriteExpiredHoldHistories finds active holds that have passed expiry, marks them
+// expired, and writes a history row for each. Called best-effort from the board.
+func WriteExpiredHoldHistories(db *sql.DB) {
+	rows, err := db.Query(
+		`SELECT id, environment_id, user_id FROM holds WHERE status = 'active' AND expires_at <= NOW()`,
+	)
+	if err != nil {
+		return
+	}
+
+	type expiredHold struct{ id, envID, userID int }
+	var expired []expiredHold
+	for rows.Next() {
+		var h expiredHold
+		if rows.Scan(&h.id, &h.envID, &h.userID) == nil {
+			expired = append(expired, h)
+		}
+	}
+	rows.Close()
+
+	for _, h := range expired {
+		db.Exec(`UPDATE holds SET status = 'expired' WHERE id = ? AND status = 'active'`, h.id)
+		db.Exec(
+			`INSERT INTO history (environment_id, user_id, actor_id, hold_id, action) VALUES (?, ?, ?, ?, 'expired')`,
+			h.envID, h.userID, h.userID, h.id,
+		)
+	}
+}
+
 func ClaimEnvironment(db *sql.DB, envID, userID int, purpose string, durationMinutes int) (*model.Hold, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -81,16 +110,26 @@ func ClaimEnvironment(db *sql.DB, envID, userID int, purpose string, durationMin
 	}
 	defer tx.Rollback()
 
-	var existingHoldID int
+	// Lock any active hold on this environment (expired or not) so we can decide atomically.
+	var existingHoldID, existingUserID int
+	var existingExpiresAt time.Time
 	err = tx.QueryRow(
-		`SELECT id FROM holds WHERE environment_id = ? AND status = 'active' AND expires_at > NOW() FOR UPDATE`,
+		`SELECT id, user_id, expires_at FROM holds WHERE environment_id = ? AND status = 'active' FOR UPDATE`,
 		envID,
-	).Scan(&existingHoldID)
+	).Scan(&existingHoldID, &existingUserID, &existingExpiresAt)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, fmt.Errorf("store.ClaimEnvironment: lock check: %w", err)
 	}
 	if err == nil {
-		return nil, ErrEnvTaken
+		if time.Now().Before(existingExpiresAt) {
+			return nil, ErrEnvTaken
+		}
+		// Hold is expired — record it and proceed with the new claim.
+		tx.Exec(`UPDATE holds SET status = 'expired' WHERE id = ?`, existingHoldID)
+		tx.Exec(
+			`INSERT INTO history (environment_id, user_id, actor_id, hold_id, action) VALUES (?, ?, ?, ?, 'expired')`,
+			envID, existingUserID, existingUserID, existingHoldID,
+		)
 	}
 
 	var userHoldCount int
@@ -116,8 +155,8 @@ func ClaimEnvironment(db *sql.DB, envID, userID int, purpose string, durationMin
 	holdID, _ := result.LastInsertId()
 
 	_, err = tx.Exec(
-		`INSERT INTO history (environment_id, user_id, hold_id, action) VALUES (?, ?, ?, 'claimed')`,
-		envID, userID, holdID,
+		`INSERT INTO history (environment_id, user_id, actor_id, hold_id, action) VALUES (?, ?, ?, ?, 'claimed')`,
+		envID, userID, userID, holdID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("store.ClaimEnvironment: insert history: %w", err)
@@ -163,8 +202,8 @@ func ReleaseHold(db *sql.DB, holdID, userID int) error {
 	}
 
 	_, err = tx.Exec(
-		`INSERT INTO history (environment_id, user_id, hold_id, action) VALUES (?, ?, ?, 'released')`,
-		h.EnvironmentID, userID, holdID,
+		`INSERT INTO history (environment_id, user_id, actor_id, hold_id, action) VALUES (?, ?, ?, ?, 'released')`,
+		h.EnvironmentID, userID, userID, holdID,
 	)
 	if err != nil {
 		return fmt.Errorf("store.ReleaseHold: history: %w", err)
@@ -195,8 +234,8 @@ func ReclaimHold(db *sql.DB, holdID, adminID int, reason string) error {
 	}
 
 	_, err = tx.Exec(
-		`INSERT INTO history (environment_id, user_id, hold_id, action, reason) VALUES (?, ?, ?, 'reclaimed', ?)`,
-		h.EnvironmentID, adminID, holdID, reason,
+		`INSERT INTO history (environment_id, user_id, actor_id, hold_id, action, reason) VALUES (?, ?, ?, ?, 'reclaimed', ?)`,
+		h.EnvironmentID, h.UserID, adminID, holdID, reason,
 	)
 	if err != nil {
 		return fmt.Errorf("store.ReclaimHold: history: %w", err)

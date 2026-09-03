@@ -9,11 +9,17 @@ import (
 
 	"envboard/middleware"
 	"envboard/service"
+	"envboard/store"
 )
 
 func ClaimEnvironment(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := middleware.GetUserID(r)
+
+		if err := store.CheckRateLimit(db, userID, "claim"); err != nil {
+			writeError(w, http.StatusTooManyRequests, "RATE_LIMITED", "too many requests, please slow down")
+			return
+		}
 
 		var req struct {
 			EnvironmentID   int    `json:"environment_id"`
@@ -50,6 +56,11 @@ func ClaimEnvironment(db *sql.DB) http.HandlerFunc {
 func ExtendHold(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := middleware.GetUserID(r)
+
+		if err := store.CheckRateLimit(db, userID, "extend"); err != nil {
+			writeError(w, http.StatusTooManyRequests, "RATE_LIMITED", "too many requests, please slow down")
+			return
+		}
 
 		holdID, err := strconv.Atoi(r.PathValue("id"))
 		if err != nil {
@@ -91,6 +102,11 @@ func ReleaseHold(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := middleware.GetUserID(r)
 
+		if err := store.CheckRateLimit(db, userID, "release"); err != nil {
+			writeError(w, http.StatusTooManyRequests, "RATE_LIMITED", "too many requests, please slow down")
+			return
+		}
+
 		holdID, err := strconv.Atoi(r.PathValue("id"))
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "INVALID_ID", "invalid hold id")
@@ -121,6 +137,11 @@ func ReleaseHold(db *sql.DB) http.HandlerFunc {
 func ReclaimHold(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		adminID := middleware.GetUserID(r)
+
+		if err := store.CheckRateLimit(db, adminID, "reclaim"); err != nil {
+			writeError(w, http.StatusTooManyRequests, "RATE_LIMITED", "too many requests, please slow down")
+			return
+		}
 
 		holdID, err := strconv.Atoi(r.PathValue("id"))
 		if err != nil {

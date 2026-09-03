@@ -16,16 +16,25 @@ func ListHistory(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		q := r.URL.Query()
+		limit, _ := strconv.Atoi(q.Get("limit"))
+		offset, _ := strconv.Atoi(q.Get("offset"))
 
-		page, err := service.ListHistory(db, envID, limit, offset)
+		page, err := service.ListHistory(db, service.HistoryParams{
+			EnvID:  envID,
+			Action: q.Get("action"),
+			From:   q.Get("from"),
+			To:     q.Get("to"),
+			Limit:  limit,
+			Offset: offset,
+		})
 		if err != nil {
-			if err == service.ErrNotFound {
+			switch err {
+			case service.ErrNotFound:
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "environment not found")
-				return
+			default:
+				writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 			}
-			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "could not load history")
 			return
 		}
 

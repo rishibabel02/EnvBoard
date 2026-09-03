@@ -2,11 +2,13 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
 
 	"envboard/service"
+	"envboard/store"
 )
 
 type contextKey string
@@ -14,7 +16,7 @@ type contextKey string
 const userIDKey contextKey = "userID"
 const userRoleKey contextKey = "userRole"
 
-func Auth(next http.HandlerFunc) http.HandlerFunc {
+func Auth(db *sql.DB, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// SSE connections use ?token= because EventSource doesn't support custom headers
 		tokenStr := r.URL.Query().Get("token")
@@ -34,6 +36,12 @@ func Auth(next http.HandlerFunc) http.HandlerFunc {
 		claims, err := service.ParseToken(tokenStr)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "invalid or expired token")
+			return
+		}
+
+		isActive, err := store.GetUserIsActive(db, claims.UserID)
+		if err != nil || !isActive {
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "account is deactivated")
 			return
 		}
 

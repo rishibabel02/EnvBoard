@@ -1,10 +1,25 @@
 import { createContext, useState, useEffect } from 'react'
+import type { AuthUser } from '../types'
 
-export const AuthContext = createContext(null)
+interface AuthContextValue {
+  user: AuthUser | null
+  token: string | null
+  login: (token: string, user: AuthUser) => void
+  logout: () => void
+  ready: boolean
+}
 
-export function AuthProvider({ children }) {
-  const [user, setUser]   = useState(null)
-  const [token, setToken] = useState(null)
+export const AuthContext = createContext<AuthContextValue>({
+  user: null,
+  token: null,
+  login: () => {},
+  logout: () => {},
+  ready: false,
+})
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser]   = useState<AuthUser | null>(null)
+  const [token, setToken] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -12,12 +27,12 @@ export function AuthProvider({ children }) {
     const u = localStorage.getItem('user')
     if (t && u) {
       setToken(t)
-      setUser(JSON.parse(u))
+      setUser(JSON.parse(u) as AuthUser)
     }
     setReady(true)
   }, [])
 
-  function login(token, user) {
+  function login(token: string, user: AuthUser) {
     localStorage.setItem('token', token)
     localStorage.setItem('user', JSON.stringify(user))
     setToken(token)

@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
 import { listUsers, createUser, updateUserRole, setUserActive, resetPassword } from '../../api/admin'
+import type { User } from '../../types'
+
+interface UserForm { name: string; email: string; password: string; role: 'member' | 'admin' }
 
 export default function UsersPage() {
-  const [users,   setUsers]   = useState([])
+  const [users,   setUsers]   = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [modal,   setModal]   = useState(null)
-  const [form,    setForm]    = useState({ name: '', email: '', password: '', role: 'member' })
+  const [modal,   setModal]   = useState(false)
+  const [form,    setForm]    = useState<UserForm>({ name: '', email: '', password: '', role: 'member' })
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState('')
-  const [pwModal, setPwModal] = useState(null)
+  const [pwModal, setPwModal] = useState<User | null>(null)
   const [newPw,   setNewPw]   = useState('')
 
   function load() {
@@ -17,30 +20,38 @@ export default function UsersPage() {
   }
   useEffect(load, [])
 
-  async function handleCreate(e) {
+  async function handleCreate(e: React.FormEvent) {
     e.preventDefault(); setSaving(true); setError('')
-    try { await createUser(form); setModal(null); load() }
-    catch (err) { setError(err.message) }
+    try { await createUser(form); setModal(false); load() }
+    catch (err) { setError(err instanceof Error ? err.message : 'Error') }
     finally { setSaving(false) }
   }
 
-  async function handleRoleToggle(user) {
+  async function handleRoleToggle(user: User) {
     const next = user.role === 'admin' ? 'member' : 'admin'
     try { await updateUserRole(user.id, next); load() }
-    catch (err) { alert(err.message) }
+    catch (err) { alert(err instanceof Error ? err.message : 'Error') }
   }
 
-  async function handleActiveToggle(user) {
+  async function handleActiveToggle(user: User) {
     try { await setUserActive(user.id, !user.is_active); load() }
-    catch (err) { alert(err.message) }
+    catch (err) { alert(err instanceof Error ? err.message : 'Error') }
   }
 
-  async function handleResetPassword(e) {
-    e.preventDefault(); setSaving(true); setError('')
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!pwModal) return
+    setSaving(true); setError('')
     try { await resetPassword(pwModal.id, newPw); setPwModal(null); setNewPw('') }
-    catch (err) { setError(err.message) }
+    catch (err) { setError(err instanceof Error ? err.message : 'Error') }
     finally { setSaving(false) }
   }
+
+  const userFormFields: Array<[string, keyof UserForm, string]> = [
+    ['Name', 'name', 'text'],
+    ['Email', 'email', 'email'],
+    ['Password', 'password', 'password'],
+  ]
 
   return (
     <Layout>
@@ -86,14 +97,17 @@ export default function UsersPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3 justify-end">
-                      <button onClick={() => handleRoleToggle(u)} className="text-xs text-gray-400 hover:text-purple-600 transition-colors">
+                    <div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => handleRoleToggle(u)}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${u.role === 'admin' ? 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100' : 'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100'}`}>
                         {u.role === 'admin' ? 'Make Member' : 'Make Admin'}
                       </button>
-                      <button onClick={() => handleActiveToggle(u)} className={`text-xs transition-colors ${u.is_active ? 'text-gray-400 hover:text-red-500' : 'text-gray-400 hover:text-emerald-600'}`}>
+                      <button onClick={() => handleActiveToggle(u)}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${u.is_active ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
                         {u.is_active ? 'Deactivate' : 'Activate'}
                       </button>
-                      <button onClick={() => { setPwModal(u); setNewPw(''); setError('') }} className="text-xs text-gray-400 hover:text-indigo-600 transition-colors">
+                      <button onClick={() => { setPwModal(u); setNewPw(''); setError('') }}
+                        className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100 transition-colors">
                         Reset PW
                       </button>
                     </div>
@@ -105,28 +119,27 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Create modal */}
       {modal && (
-        <ModalWrapper title="New User" onClose={() => setModal(null)}>
+        <ModalWrapper title="New User" onClose={() => setModal(false)}>
           <form onSubmit={handleCreate} className="space-y-4">
-            {[['Name', 'name', 'text'], ['Email', 'email', 'email'], ['Password', 'password', 'password']].map(([label, field, type]) => (
-              <Field key={field} label={label} type={type} value={form[field]} onChange={v => setForm(f => ({ ...f, [field]: v }))} />
+            {userFormFields.map(([label, field, type]) => (
+              <Field key={field} label={label} type={type} value={form[field]}
+                onChange={v => setForm(f => ({ ...f, [field]: v }))} />
             ))}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
-              <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+              <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as 'member' | 'admin' }))}
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="member">Member</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
             {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-            <ModalFooter onClose={() => setModal(null)} saving={saving} label="Create User" />
+            <ModalFooter onClose={() => setModal(false)} saving={saving} label="Create User" />
           </form>
         </ModalWrapper>
       )}
 
-      {/* Reset password modal */}
       {pwModal && (
         <ModalWrapper title={`Reset Password — ${pwModal.name}`} onClose={() => setPwModal(null)}>
           <form onSubmit={handleResetPassword} className="space-y-4">
@@ -140,7 +153,7 @@ export default function UsersPage() {
   )
 }
 
-function ModalWrapper({ title, onClose, children }) {
+function ModalWrapper({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -155,7 +168,7 @@ function ModalWrapper({ title, onClose, children }) {
   )
 }
 
-function Field({ label, type, value, onChange }) {
+function Field({ label, type, value, onChange }: { label: string; type: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
@@ -165,7 +178,7 @@ function Field({ label, type, value, onChange }) {
   )
 }
 
-function ModalFooter({ onClose, saving, label }) {
+function ModalFooter({ onClose, saving, label }: { onClose: () => void; saving: boolean; label: string }) {
   return (
     <div className="flex gap-3 pt-1">
       <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>

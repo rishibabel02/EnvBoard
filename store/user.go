@@ -7,6 +7,18 @@ import (
 	"envboard/model"
 )
 
+func GetUserIsActive(db *sql.DB, id int) (bool, error) {
+	var isActive bool
+	err := db.QueryRow(`SELECT is_active FROM users WHERE id = ?`, id).Scan(&isActive)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("store.GetUserIsActive: %w", err)
+	}
+	return isActive, nil
+}
+
 func GetUserByEmail(db *sql.DB, email string) (*model.User, error) {
 	u := &model.User{}
 	query := `

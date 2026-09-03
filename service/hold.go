@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	minDurationMinutes = 15
-	maxDurationMinutes = 480
+	minDurationMinutes = 1
+	maxDurationMinutes = 4320
 )
 
 func ClaimEnvironment(db *sql.DB, envID, userID int, purpose string, durationMinutes int) (*model.Hold, error) {
@@ -74,7 +74,7 @@ func ExtendHold(db *sql.DB, holdID, userID, addMinutes int) (*model.Hold, error)
 	if err != nil {
 		return nil, err
 	}
-	store.InsertHistory(db, hold.EnvironmentID, userID, &holdID, "extended", nil)
+	store.InsertHistory(db, hold.EnvironmentID, userID, &holdID, "extended", nil, &userID)
 	return result, nil
 }
 

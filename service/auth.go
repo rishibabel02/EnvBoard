@@ -3,6 +3,7 @@ package service
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -12,9 +13,11 @@ import (
 	"envboard/store"
 )
 
-// jwtSecret signs and verifies all tokens. Move to env variable before deploying.
-const jwtSecret = "change-this-secret-before-production"
 const jwtExpiry = 24 * time.Hour
+
+func jwtSecret() []byte {
+	return []byte(os.Getenv("JWT_SECRET"))
+}
 
 type Claims struct {
 	UserID int    `json:"user_id"`
@@ -65,7 +68,7 @@ func generateToken(user *model.User) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString([]byte(jwtSecret))
+	signed, err := token.SignedString(jwtSecret())
 	if err != nil {
 		return "", fmt.Errorf("service.generateToken: %w", err)
 	}
@@ -77,7 +80,7 @@ func ParseToken(tokenStr string) (*Claims, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		return []byte(jwtSecret), nil
+		return jwtSecret(), nil
 	})
 	if err != nil || !token.Valid {
 		return nil, ErrInvalidToken
