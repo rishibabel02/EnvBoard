@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { listHistory } from '../api/history'
 import type { HistoryItem } from '../types'
@@ -27,6 +27,8 @@ const LIMIT = 20
 export default function HistoryPage() {
   const { id }   = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const envName  = (location.state as { name?: string } | null)?.name
 
   const [entries,  setEntries]  = useState<HistoryItem[]>([])
   const [total,    setTotal]    = useState(0)
@@ -86,7 +88,9 @@ export default function HistoryPage() {
             ← Board
           </button>
           <span className="text-gray-200">/</span>
-          <h1 className="text-xl font-bold text-gray-900">Environment History</h1>
+          <h1 className="text-xl font-bold text-gray-900">
+            {envName ? `${envName} — History` : 'Environment History'}
+          </h1>
         </div>
 
         {/* Filter bar */}
