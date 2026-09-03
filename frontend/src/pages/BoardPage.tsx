@@ -76,7 +76,7 @@ export default function BoardPage() {
               onExtend={setExtendEnv}
               onRelease={handleRelease}
               onReclaim={setReclaimEnv}
-              onHistory={env => navigate(`/environments/${env.id}/history`)}
+              onHistory={env => navigate(`/environments/${env.id}/history`, { state: { name: env.name } })}
             />
           ))}
         </div>
