@@ -68,6 +68,32 @@ func UpdateEnvironment(db *sql.DB, id int, name, description, consoleURL string)
 	return env, nil
 }
 
+func DeleteEnvironment(db *sql.DB, id int) error {
+	existing, err := store.GetEnvironmentByID(db, id)
+	if err != nil {
+		return fmt.Errorf("service.DeleteEnvironment: %w", err)
+	}
+	if existing == nil {
+		return ErrNotFound
+	}
+
+	active, err := store.HasActiveHold(db, id)
+	if err != nil {
+		return fmt.Errorf("service.DeleteEnvironment: %w", err)
+	}
+	if active {
+		return fmt.Errorf("environment has an active hold — release it first")
+	}
+
+	if err := store.DeleteEnvironment(db, id); err != nil {
+		if strings.Contains(err.Error(), "foreign key constraint") {
+			return fmt.Errorf("environment has history records — deactivate it instead")
+		}
+		return fmt.Errorf("service.DeleteEnvironment: %w", err)
+	}
+	return nil
+}
+
 func SetEnvironmentActive(db *sql.DB, id int, isActive bool) (*model.Environment, error) {
 	existing, err := store.GetEnvironmentByID(db, id)
 	if err != nil {

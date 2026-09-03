@@ -94,3 +94,23 @@ func SetEnvironmentActive(db *sql.DB, id int, isActive bool) (*model.Environment
 
 	return GetEnvironmentByID(db, id)
 }
+
+func DeleteEnvironment(db *sql.DB, id int) error {
+	_, err := db.Exec(`DELETE FROM environments WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("store.DeleteEnvironment: %w", err)
+	}
+	return nil
+}
+
+func HasActiveHold(db *sql.DB, envID int) (bool, error) {
+	var count int
+	err := db.QueryRow(
+		`SELECT COUNT(*) FROM holds WHERE environment_id = ? AND status = 'active' AND expires_at > NOW()`,
+		envID,
+	).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("store.HasActiveHold: %w", err)
+	}
+	return count > 0, nil
+}
