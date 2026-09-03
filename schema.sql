@@ -153,19 +153,3 @@ CREATE TABLE admin_actions (
 
     CONSTRAINT fk_admin_actions_admin FOREIGN KEY (admin_id) REFERENCES users (id)
 );
-
-
-use envboard;
-
-UPDATE envboard.environments 
-SET description = 'Primary Dev environment', 
-    console_url = 'https://dev01-example.com'
-WHERE id = 1;
-
-INSERT INTO envboard.environments (name, description, console_url) VALUES
-('staging-02', 'Secondary Dev environment', 'https://dev02-example.com'),
-('staging-03', 'QA Dev environment',        'https://stage01-example.com');
-
-
-
--- show tables;
