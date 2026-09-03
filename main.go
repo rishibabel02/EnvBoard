@@ -67,6 +67,7 @@ func main() {
 	mux.HandleFunc("POST /api/environments", middleware.Auth(db,middleware.AdminOnly(handler.CreateEnvironment(db))))
 	mux.HandleFunc("PATCH /api/environments/{id}", middleware.Auth(db,middleware.AdminOnly(handler.UpdateEnvironment(db))))
 	mux.HandleFunc("PATCH /api/environments/{id}/status", middleware.Auth(db,middleware.AdminOnly(handler.SetEnvironmentActive(db))))
+	mux.HandleFunc("DELETE /api/environments/{id}", middleware.Auth(db,middleware.AdminOnly(handler.DeleteEnvironment(db))))
 
 	fmt.Println("server starting on :8080")
 	if err := http.ListenAndServe(":8080", mux); err != nil {

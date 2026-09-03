@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
-import { listEnvironments, createEnvironment, updateEnvironment, setEnvActive } from '../../api/environments'
+import { listEnvironments, createEnvironment, updateEnvironment, setEnvActive, deleteEnvironment } from '../../api/environments'
 import type { Environment } from '../../types'
 
 interface EnvForm { name: string; description: string; console_url: string }
@@ -36,6 +36,12 @@ export default function EnvironmentsPage() {
 
   async function toggleActive(env: Environment) {
     try { await setEnvActive(env.id, !env.is_active); load() }
+    catch (err) { alert(err instanceof Error ? err.message : 'Error') }
+  }
+
+  async function handleDelete(env: Environment) {
+    if (!confirm(`Delete "${env.name}"? This cannot be undone.`)) return
+    try { await deleteEnvironment(env.id); load() }
     catch (err) { alert(err instanceof Error ? err.message : 'Error') }
   }
 
@@ -90,6 +96,10 @@ export default function EnvironmentsPage() {
                       <button onClick={() => toggleActive(env)}
                         className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${env.is_active ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
                         {env.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button onClick={() => handleDelete(env)}
+                        className="px-3 py-1.5 rounded-lg border border-red-300 bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 transition-colors">
+                        Delete
                       </button>
                     </div>
                   </td>

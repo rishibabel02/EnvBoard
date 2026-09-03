@@ -109,6 +109,27 @@ func UpdateEnvironment(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+func DeleteEnvironment(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := pathIDFromValue(r)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "INVALID_ID", "invalid environment id")
+			return
+		}
+
+		if err := service.DeleteEnvironment(db, id); err != nil {
+			switch err {
+			case service.ErrNotFound:
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "environment not found")
+			default:
+				writeError(w, http.StatusConflict, "CONFLICT", err.Error())
+			}
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"message": "environment deleted"})
+	}
+}
+
 func SetEnvironmentActive(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := pathIDFromValue(r)
