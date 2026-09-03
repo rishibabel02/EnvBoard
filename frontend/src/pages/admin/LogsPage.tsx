@@ -122,14 +122,21 @@ export default function LogsPage() {
   const [fAction, setFAction] = useState('')
   const [fFrom,   setFFrom]   = useState('')
   const [fTo,     setFTo]     = useState('')
+  const [fName,   setFName]   = useState('')
 
-  const hasFilters = fSource || fAction || fFrom || fTo
+  const hasFilters = fSource || fAction || fFrom || fTo || fName
 
   const filtered = rows.filter(r => {
     if (fSource && r.source !== fSource) return false
     if (fAction && r.action !== fAction) return false
     if (fFrom   && new Date(r.created_at) < new Date(fFrom)) return false
     if (fTo     && new Date(r.created_at) > new Date(fTo))   return false
+    if (fName) {
+      const q = fName.toLowerCase()
+      const whoMatch   = r.who?.toLowerCase().includes(q)   ?? false
+      const actorMatch = r.actor?.toLowerCase().includes(q) ?? false
+      if (!whoMatch && !actorMatch) return false
+    }
     return true
   })
 
@@ -137,13 +144,13 @@ export default function LogsPage() {
   useEffect(() => { setFAction('') }, [fSource])
 
   // reset to page 0 whenever filters change
-  useEffect(() => { setPage(0) }, [fSource, fAction, fFrom, fTo])
+  useEffect(() => { setPage(0) }, [fSource, fAction, fFrom, fTo, fName])
 
   const totalPages  = Math.ceil(filtered.length / PAGE_SIZE)
   const paged       = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   function clearFilters() {
-    setFSource(''); setFAction(''); setFFrom(''); setFTo('')
+    setFSource(''); setFAction(''); setFFrom(''); setFTo(''); setFName('')
   }
 
   function load(isRefresh = false) {
@@ -191,6 +198,11 @@ export default function LogsPage() {
             <option value="admin">Admin</option>
             <option value="hold">Hold</option>
           </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
+          <input type="text" value={fName} onChange={e => setFName(e.target.value)} placeholder="Search by name…"
+            className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-700 w-40 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Action</label>
