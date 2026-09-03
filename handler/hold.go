@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"envboard/middleware"
+	"envboard/notification"
 	"envboard/service"
 	"envboard/store"
 )
@@ -150,7 +151,8 @@ func ReclaimHold(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if err := service.ReclaimHold(db, holdID, adminID, req.Reason); err != nil {
+		hold, err := service.ReclaimHold(db, holdID, adminID, req.Reason)
+		if err != nil {
 			switch err {
 			case service.ErrNotFound:
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "hold not found")
@@ -161,6 +163,20 @@ func ReclaimHold(db *sql.DB) http.HandlerFunc {
 			}
 			return
 		}
+
+		if env, err := store.GetEnvironmentByID(db, hold.EnvironmentID); err == nil && env != nil {
+			adminName := ""
+			if admin, err := store.GetUserByID(db, adminID); err == nil && admin != nil {
+				adminName = admin.Name
+			}
+			notification.Push(hold.UserID, notification.Notif{
+				Type:      "reclaim",
+				EnvName:   env.Name,
+				Reason:    req.Reason,
+				AdminName: adminName,
+			})
+		}
+
 		writeJSON(w, http.StatusOK, map[string]interface{}{"message": "hold reclaimed"})
 	}
 }
