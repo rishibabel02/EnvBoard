@@ -155,8 +155,8 @@ func ClaimEnvironment(db *sql.DB, envID, userID int, purpose string, durationMin
 	holdID, _ := result.LastInsertId()
 
 	_, err = tx.Exec(
-		`INSERT INTO history (environment_id, user_id, actor_id, hold_id, action) VALUES (?, ?, ?, ?, 'claimed')`,
-		envID, userID, userID, holdID,
+		`INSERT INTO history (environment_id, user_id, actor_id, hold_id, action, reason) VALUES (?, ?, ?, ?, 'claimed', ?)`,
+		envID, userID, userID, holdID, purpose,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("store.ClaimEnvironment: insert history: %w", err)

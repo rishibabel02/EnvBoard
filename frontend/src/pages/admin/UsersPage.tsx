@@ -12,8 +12,9 @@ export default function UsersPage() {
   const [form,    setForm]    = useState<UserForm>({ name: '', email: '', password: '', role: 'member' })
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState('')
-  const [pwModal, setPwModal] = useState<User | null>(null)
-  const [newPw,   setNewPw]   = useState('')
+  const [pwModal,   setPwModal]   = useState<User | null>(null)
+  const [newPw,     setNewPw]     = useState('')
+  const [updating,  setUpdating]  = useState<number | null>(null)
 
   function load() {
     listUsers().then(r => setUsers(r.data ?? [])).finally(() => setLoading(false))
@@ -28,14 +29,20 @@ export default function UsersPage() {
   }
 
   async function handleRoleToggle(user: User) {
+    if (updating === user.id) return
+    setUpdating(user.id)
     const next = user.role === 'admin' ? 'member' : 'admin'
     try { await updateUserRole(user.id, next); load() }
     catch (err) { alert(err instanceof Error ? err.message : 'Error') }
+    finally { setUpdating(null) }
   }
 
   async function handleActiveToggle(user: User) {
+    if (updating === user.id) return
+    setUpdating(user.id)
     try { await setUserActive(user.id, !user.is_active); load() }
     catch (err) { alert(err instanceof Error ? err.message : 'Error') }
+    finally { setUpdating(null) }
   }
 
   async function handleResetPassword(e: React.FormEvent) {
@@ -98,12 +105,12 @@ export default function UsersPage() {
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2 justify-end">
-                      <button onClick={() => handleRoleToggle(u)}
-                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${u.role === 'admin' ? 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100' : 'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100'}`}>
+                      <button onClick={() => handleRoleToggle(u)} disabled={updating === u.id}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 ${u.role === 'admin' ? 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100' : 'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100'}`}>
                         {u.role === 'admin' ? 'Make Member' : 'Make Admin'}
                       </button>
-                      <button onClick={() => handleActiveToggle(u)}
-                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${u.is_active ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
+                      <button onClick={() => handleActiveToggle(u)} disabled={updating === u.id}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 ${u.is_active ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
                         {u.is_active ? 'Deactivate' : 'Activate'}
                       </button>
                       <button onClick={() => { setPwModal(u); setNewPw(''); setError('') }}

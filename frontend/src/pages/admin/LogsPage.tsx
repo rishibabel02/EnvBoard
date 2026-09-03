@@ -6,14 +6,13 @@ import type { AdminLog, AdminAction, AuditItem } from '../../types'
 // ── Unified shape ────────────────────────────────────────────────────────────
 interface UnifiedLog {
   key:         string
-  source:      'system' | 'admin' | 'audit'
+  source:      'system' | 'admin' | 'hold'
   created_at:  string
   who:         string | null
   actor:       string | null
   action:      string
   environment: string | null
   detail:      string | null
-  user_agent:  string | null
 }
 
 function fromLog(l: AdminLog): UnifiedLog {
@@ -25,13 +24,11 @@ function fromLog(l: AdminLog): UnifiedLog {
     actor:       null,
     action:      l.event,
     environment: null,
-    detail:      l.ip_address,
-    user_agent:  l.user_agent,
+    detail:      l.details ?? null,
   }
 }
 
 function fromAction(a: AdminAction): UnifiedLog {
-  const target = a.target_type && a.target_id ? `${a.target_type} #${a.target_id}` : null
   return {
     key:         `adm-${a.id}`,
     source:      'admin',
@@ -40,30 +37,28 @@ function fromAction(a: AdminAction): UnifiedLog {
     actor:       null,
     action:      a.action,
     environment: null,
-    detail:      target ?? a.details,
-    user_agent:  null,
+    detail:      a.details,
   }
 }
 
 function fromAudit(item: AuditItem): UnifiedLog {
   return {
     key:         `aud-${item.id}`,
-    source:      'audit',
+    source:      'hold',
     created_at:  item.created_at,
     who:         item.user_name,
     actor:       item.actor_name && item.actor_name !== item.user_name ? item.actor_name : null,
     action:      item.action,
     environment: item.environment_name,
     detail:      item.reason,
-    user_agent:  null,
   }
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 const SOURCE_STYLE: Record<string, string> = {
-  system: 'bg-slate-100 text-slate-600',
+  system: 'bg-sky-50 text-sky-700',
   admin:  'bg-purple-50 text-purple-700',
-  audit:  'bg-indigo-50 text-indigo-700',
+  hold:   'bg-emerald-50 text-emerald-700',
 }
 
 const ACTION_STYLE: Record<string, string> = {
@@ -88,50 +83,25 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString()
 }
 
-// ── UAModal ──────────────────────────────────────────────────────────────────
-function UAModal({ ua, onClose }: { ua: string; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">User Agent</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100">✕</button>
-        </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-gray-700 font-mono break-all leading-relaxed">{ua}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 const PAGE_SIZE = 50
 
 const SOURCE_ACTIONS: Record<string, { label: string; value: string }[]> = {
   '': [
-    { label: 'login success',  value: 'login_success'  },
-    { label: 'login failed',   value: 'login_failed'   },
-    { label: 'hold claimed',   value: 'hold_claimed'   },
-    { label: 'hold extended',  value: 'hold_extended'  },
-    { label: 'hold released',  value: 'hold_released'  },
-    { label: 'hold reclaimed', value: 'hold_reclaimed' },
-    { label: 'claimed',        value: 'claimed'        },
-    { label: 'extended',       value: 'extended'       },
-    { label: 'released',       value: 'released'       },
-    { label: 'expired',        value: 'expired'        },
-    { label: 'reclaimed',      value: 'reclaimed'      },
+    { label: 'login success', value: 'login_success' },
+    { label: 'login failed',  value: 'login_failed'  },
+    { label: 'claimed',       value: 'claimed'       },
+    { label: 'extended',      value: 'extended'      },
+    { label: 'released',      value: 'released'      },
+    { label: 'expired',       value: 'expired'       },
+    { label: 'reclaimed',     value: 'reclaimed'     },
   ],
   system: [
-    { label: 'login success',  value: 'login_success'  },
-    { label: 'login failed',   value: 'login_failed'   },
-    { label: 'hold claimed',   value: 'hold_claimed'   },
-    { label: 'hold extended',  value: 'hold_extended'  },
-    { label: 'hold released',  value: 'hold_released'  },
-    { label: 'hold reclaimed', value: 'hold_reclaimed' },
+    { label: 'login success', value: 'login_success' },
+    { label: 'login failed',  value: 'login_failed'  },
   ],
   admin: [],
-  audit: [
+  hold: [
     { label: 'claimed',   value: 'claimed'   },
     { label: 'extended',  value: 'extended'  },
     { label: 'released',  value: 'released'  },
@@ -142,11 +112,10 @@ const SOURCE_ACTIONS: Record<string, { label: string; value: string }[]> = {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function LogsPage() {
-  const [rows,      setRows]      = useState<UnifiedLog[]>([])
-  const [loading,   setLoading]   = useState(true)
+  const [rows,       setRows]      = useState<UnifiedLog[]>([])
+  const [loading,    setLoading]   = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [expandUA,  setExpandUA]  = useState<string | null>(null)
-  const [page,      setPage]      = useState(0)
+  const [page,       setPage]      = useState(0)
 
   // filters
   const [fSource, setFSource] = useState('')
@@ -220,7 +189,7 @@ export default function LogsPage() {
             <option value="">All sources</option>
             <option value="system">System</option>
             <option value="admin">Admin</option>
-            <option value="audit">Audit</option>
+            <option value="hold">Hold</option>
           </select>
         </div>
         <div>
@@ -297,34 +266,29 @@ export default function LogsPage() {
                   <td className="px-5 py-3.5 text-gray-500 text-xs">
                     {row.environment ?? <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-5 py-3.5 text-gray-400 text-xs max-w-xs truncate"
-                    style={{ cursor: row.user_agent ? 'pointer' : 'default' }}
-                    onClick={() => row.user_agent && setExpandUA(row.user_agent)}
-                    title={row.user_agent ? 'Click to view full user agent' : undefined}>
-                    {row.detail ?? (row.user_agent ? <span className="text-indigo-500 hover:underline">UA</span> : <span className="text-gray-300">—</span>)}
+                  <td className="px-5 py-3.5 text-gray-400 text-xs max-w-xs truncate">
+                    {row.detail ?? <span className="text-gray-300">—</span>}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 text-sm text-gray-500">
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                className="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors text-xs">
+                ← Previous
+              </button>
+              <span className="text-xs text-gray-400">Page {page + 1} of {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+                className="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors text-xs">
+                Next →
+              </button>
+            </div>
+          )}
         </div>
-
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-50 text-sm text-gray-500">
-            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-              className="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors text-xs">
-              ← Previous
-            </button>
-            <span className="text-xs text-gray-400">Page {page + 1} of {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-              className="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors text-xs">
-              Next →
-            </button>
-          </div>
-        )}
-        </>
+</>
       )}
-      {expandUA && <UAModal ua={expandUA} onClose={() => setExpandUA(null)} />}
     </Layout>
   )
 }
