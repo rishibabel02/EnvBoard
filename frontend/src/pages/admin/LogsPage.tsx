@@ -100,7 +100,18 @@ const SOURCE_ACTIONS: Record<string, { label: string; value: string }[]> = {
     { label: 'login success', value: 'login_success' },
     { label: 'login failed',  value: 'login_failed'  },
   ],
-  admin: [],
+  admin: [
+    { label: 'create user',           value: 'create_user'           },
+    { label: 'update role',           value: 'update_role'           },
+    { label: 'activate user',         value: 'activate_user'         },
+    { label: 'deactivate user',       value: 'deactivate_user'       },
+    { label: 'reset password',        value: 'reset_password'        },
+    { label: 'create environment',    value: 'create_environment'    },
+    { label: 'update environment',    value: 'update_environment'    },
+    { label: 'delete environment',    value: 'delete_environment'    },
+    { label: 'activate environment',  value: 'activate_environment'  },
+    { label: 'deactivate environment',value: 'deactivate_environment'},
+  ],
   hold: [
     { label: 'claimed',   value: 'claimed'   },
     { label: 'extended',  value: 'extended'  },
@@ -207,8 +218,7 @@ export default function LogsPage() {
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Action</label>
           <select value={fAction} onChange={e => setFAction(e.target.value)}
-            disabled={SOURCE_ACTIONS[fSource]?.length === 0}
-            className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed">
+            className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="">All actions</option>
             {(SOURCE_ACTIONS[fSource] ?? SOURCE_ACTIONS['']).map(a => (
               <option key={a.value} value={a.value}>{a.label}</option>

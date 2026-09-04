@@ -7,7 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"envboard/middleware"
+	"envboard/notification"
 	"envboard/service"
+	"envboard/store"
 )
 
 
@@ -59,7 +62,8 @@ func CreateEnvironment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		env, err := service.CreateEnvironment(db, req.Name, req.Description, req.ConsoleURL)
+		adminID := middleware.GetUserID(r)
+		env, err := service.CreateEnvironment(db, adminID, req.Name, req.Description, req.ConsoleURL)
 		if err != nil {
 			switch {
 			case strings.Contains(err.Error(), "name is required"):
@@ -93,7 +97,8 @@ func UpdateEnvironment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		env, err := service.UpdateEnvironment(db, id, req.Name, req.Description, req.ConsoleURL)
+		adminID := middleware.GetUserID(r)
+		env, err := service.UpdateEnvironment(db, adminID, id, req.Name, req.Description, req.ConsoleURL)
 		if err != nil {
 			switch {
 			case err == service.ErrNotFound:
@@ -117,7 +122,8 @@ func DeleteEnvironment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if err := service.DeleteEnvironment(db, id); err != nil {
+		adminID := middleware.GetUserID(r)
+		if err := service.DeleteEnvironment(db, adminID, id); err != nil {
 			switch err {
 			case service.ErrNotFound:
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "environment not found")
@@ -140,21 +146,50 @@ func SetEnvironmentActive(db *sql.DB) http.HandlerFunc {
 
 		var req struct {
 			IsActive bool `json:"is_active"`
+			Force    bool `json:"force"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "INVALID_BODY", "invalid request body")
 			return
 		}
 
-		env, err := service.SetEnvironmentActive(db, id, req.IsActive)
+		adminID := middleware.GetUserID(r)
+		env, releasedUserID, err := service.SetEnvironmentActive(db, adminID, id, req.IsActive, req.Force)
 		if err != nil {
-			if err == service.ErrNotFound {
+			switch {
+			case err == service.ErrNotFound:
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "environment not found")
-				return
+			default:
+				if ahe, ok := err.(*service.ActiveHoldError); ok {
+					writeJSON(w, http.StatusConflict, map[string]interface{}{
+						"code": "HAS_ACTIVE_HOLD",
+						"holder": map[string]interface{}{
+							"name":    ahe.HolderName,
+							"purpose": ahe.Purpose,
+						},
+					})
+					return
+				}
+				writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "could not update environment")
 			}
-			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "could not update environment")
 			return
 		}
+
+		// If a hold was force-released, notify the holder and get env name for notification
+		if releasedUserID > 0 {
+			envName := env.Name
+			// get admin name for the notification
+			adminName := ""
+			if u, err := store.GetUserByID(db, adminID); err == nil && u != nil {
+				adminName = u.Name
+			}
+			notification.Push(releasedUserID, notification.Notif{
+				Type:      "env_deactivated",
+				EnvName:   envName,
+				AdminName: adminName,
+			})
+		}
+
 		writeJSON(w, http.StatusOK, map[string]interface{}{"data": env})
 	}
 }

@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
 import { listEnvironments, createEnvironment, updateEnvironment, setEnvActive, deleteEnvironment } from '../../api/environments'
+import { ApiError } from '../../types'
 import type { Environment } from '../../types'
 
 interface EnvForm { name: string; description: string; console_url: string }
 
+interface HoldConflict { env: Environment; holderName: string; purpose: string }
+
 export default function EnvironmentsPage() {
-  const [envs,    setEnvs]    = useState<Environment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [modal,   setModal]   = useState<null | 'create' | Environment>(null)
-  const [form,    setForm]    = useState<EnvForm>({ name: '', description: '', console_url: '' })
-  const [saving,  setSaving]  = useState(false)
-  const [error,   setError]   = useState('')
+  const [envs,     setEnvs]     = useState<Environment[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [modal,    setModal]    = useState<null | 'create' | Environment>(null)
+  const [form,     setForm]     = useState<EnvForm>({ name: '', description: '', console_url: '' })
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState('')
+  const [conflict, setConflict] = useState<HoldConflict | null>(null)
 
   function load() {
     listEnvironments()
@@ -35,8 +39,28 @@ export default function EnvironmentsPage() {
   }
 
   async function toggleActive(env: Environment) {
-    try { await setEnvActive(env.id, !env.is_active); load() }
-    catch (err) { alert(err instanceof Error ? err.message : 'Error') }
+    try {
+      await setEnvActive(env.id, !env.is_active)
+      load()
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.code === 'HAS_ACTIVE_HOLD') {
+        const d = err.data as { holder?: { name: string; purpose: string } }
+        if (d?.holder) {
+          setConflict({ env, holderName: d.holder.name, purpose: d.holder.purpose })
+          return
+        }
+      }
+      alert(err instanceof Error ? err.message : 'Error')
+    }
+  }
+
+  async function forceDeactivate() {
+    if (!conflict) return
+    try {
+      await setEnvActive(conflict.env.id, false, true)
+      setConflict(null)
+      load()
+    } catch (err) { alert(err instanceof Error ? err.message : 'Error') }
   }
 
   async function handleDelete(env: Environment) {
@@ -137,6 +161,32 @@ export default function EnvironmentsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {conflict && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConflict(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900">Environment In Use</h2>
+              <button onClick={() => setConflict(null)} className="text-gray-400 hover:text-gray-600 w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100">✕</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">{conflict.env.name}</span> is currently held by{' '}
+                <span className="font-semibold text-indigo-700">{conflict.holderName}</span>
+                {conflict.purpose && <> for <span className="italic text-gray-500">"{conflict.purpose}"</span></>}.
+              </p>
+              <p className="text-sm text-gray-500">Deactivating will force-release their hold and notify them. Continue?</p>
+              <div className="flex gap-3 pt-1">
+                <button onClick={() => setConflict(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
+                <button onClick={forceDeactivate} className="flex-1 py-2.5 rounded-xl bg-red-600 text-sm font-medium text-white hover:bg-red-700">
+                  Deactivate Anyway
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -21,9 +21,10 @@ export async function request<T>(method: string, path: string, body?: unknown): 
 
   if (!res.ok) {
     throw new ApiError(
-      data?.error?.message ?? 'Something went wrong',
-      data?.error?.code ?? 'UNKNOWN',
+      data?.error?.message ?? data?.message ?? 'Something went wrong',
+      data?.error?.code ?? data?.code ?? 'UNKNOWN',
       res.status,
+      data,
     )
   }
 
