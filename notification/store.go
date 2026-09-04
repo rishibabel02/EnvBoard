@@ -3,7 +3,7 @@ package notification
 import "sync"
 
 type Notif struct {
-	Type        string `json:"type"`                  // "reclaim" | "expiry_warning"
+	Type        string `json:"type"`                  // "reclaim" | "expiry_warning" | "env_deactivated"
 	EnvName     string `json:"env_name"`
 	Reason      string `json:"reason,omitempty"`
 	AdminName   string `json:"admin_name,omitempty"`

@@ -11,7 +11,7 @@ import { releaseHold } from '../api/holds'
 import type { BoardEntry } from '../types'
 
 interface Toast {
-  kind:        'reclaim' | 'expiry_warning'
+  kind:        'reclaim' | 'expiry_warning' | 'env_deactivated'
   envName:     string
   reason?:     string
   adminName?:  string
@@ -74,20 +74,24 @@ export default function BoardPage() {
   return (
     <Layout>
       {toast && (
-        <div className={`fixed top-5 right-5 z-50 flex items-start gap-3 bg-white shadow-lg rounded-2xl px-4 py-3 max-w-sm border ${toast.kind === 'reclaim' ? 'border-red-200' : 'border-amber-200'}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${toast.kind === 'reclaim' ? 'bg-red-100' : 'bg-amber-100'}`}>
-            {toast.kind === 'reclaim' ? (
-              <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-            ) : (
+        <div className={`fixed top-5 right-5 z-50 flex items-start gap-3 bg-white shadow-lg rounded-2xl px-4 py-3 max-w-sm border ${
+          toast.kind === 'reclaim' || toast.kind === 'env_deactivated' ? 'border-red-200' : 'border-amber-200'
+        }`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+            toast.kind === 'reclaim' || toast.kind === 'env_deactivated' ? 'bg-red-100' : 'bg-amber-100'
+          }`}>
+            {toast.kind === 'expiry_warning' ? (
               <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
               </svg>
             )}
           </div>
           <div className="flex-1 min-w-0">
-            {toast.kind === 'reclaim' ? (
+            {toast.kind === 'reclaim' && (
               <>
                 <p className="text-sm font-semibold text-gray-900">Hold force-released</p>
                 <p className="text-xs text-gray-500 mt-0.5">
@@ -96,7 +100,18 @@ export default function BoardPage() {
                 </p>
                 {toast.reason && <p className="text-xs text-gray-400 mt-0.5 italic">"{toast.reason}"</p>}
               </>
-            ) : (
+            )}
+            {toast.kind === 'env_deactivated' && (
+              <>
+                <p className="text-sm font-semibold text-gray-900">Environment deactivated</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  <span className="font-medium text-gray-700">{toast.envName}</span> was deactivated
+                  {toast.adminName && <> by <span className="font-medium text-purple-700">{toast.adminName}</span></>}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">Your hold has been released.</p>
+              </>
+            )}
+            {toast.kind === 'expiry_warning' && (
               <>
                 <p className="text-sm font-semibold text-gray-900">Hold expiring soon</p>
                 <p className="text-xs text-gray-500 mt-0.5">

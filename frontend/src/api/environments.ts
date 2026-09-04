@@ -9,5 +9,5 @@ export const createEnvironment = (data: { name: string; description: string; con
   post<EnvResponse>('/environments', data)
 export const updateEnvironment = (id: number, data: { name: string; description: string; console_url: string }) =>
   patch<EnvResponse>(`/environments/${id}`, data)
-export const setEnvActive      = (id: number, is_active: boolean)                 => patch<EnvResponse>(`/environments/${id}/status`, { is_active })
+export const setEnvActive      = (id: number, is_active: boolean, force = false)  => patch<EnvResponse>(`/environments/${id}/status`, { is_active, force })
 export const deleteEnvironment = (id: number)                                      => del<{ message: string }>(`/environments/${id}`)

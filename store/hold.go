@@ -108,6 +108,24 @@ type ExpiringHold struct {
 	EnvName string
 }
 
+func GetActiveHoldForEnv(db *sql.DB, envID int) (*ActiveHold, error) {
+	ah := &ActiveHold{}
+	err := db.QueryRow(`
+		SELECT h.id, h.environment_id, h.user_id, u.name, h.purpose, h.started_at, h.expires_at
+		FROM holds h
+		JOIN users u ON u.id = h.user_id
+		WHERE h.environment_id = ? AND h.status = 'active' AND h.expires_at > NOW()
+		LIMIT 1`, envID,
+	).Scan(&ah.HoldID, &ah.EnvironmentID, &ah.UserID, &ah.HolderName, &ah.Purpose, &ah.StartedAt, &ah.ExpiresAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store.GetActiveHoldForEnv: %w", err)
+	}
+	return ah, nil
+}
+
 func GetExpiringHoldsForUser(db *sql.DB, userID, withinMinutes int) ([]ExpiringHold, error) {
 	rows, err := db.Query(`
 		SELECT h.id, e.name
